@@ -13,7 +13,7 @@ var CONFIG = {
   SERVICE_END: "16:00",                     // service ends
   /* No jeeps during these breaks. Add more rows if needed. */
   BREAKS: [
-    { start: "12:00", end: "13:30", label: "Lunch break" }
+    { start: "11:30", end: "13:30", label: "Lunch break" }
   ]
 };
 
@@ -33,13 +33,14 @@ var ROUTE_SPAN = 0.9;
    route's stops list (see routes.js); secondsIntoSegment is optional
    (0 = exactly at the stop).                                          */
 var JEEP_COUNT = 3;
+var JEEP_SPACING_SEC = 120;   // each jeep runs 2 minutes behind the previous one
 var CYCLE_SEC = ROUTES.A.total + ROUTES.B.total;
 var JEEPS_SIM = [];
 for (var n = 0; n < JEEP_COUNT; n++) {
   JEEPS_SIM.push({
     id: "J" + (n + 1),
     label: "Jeep " + (n + 1),
-    offsetSec: (CYCLE_SEC * n) / JEEP_COUNT
+    offsetSec: (JEEP_SPACING_SEC * (JEEP_COUNT - 1 - n)) % CYCLE_SEC   // Jeep 1 leads
   });
 }
 
