@@ -116,6 +116,21 @@ function etaSeconds(routeKey, stopIndex, secIntoSeg, targetIndex) {
   return { status: "ok", seconds: roundMs(Math.max(0, remaining)) };
 }
 
+/* Move a location forward by `elapsed` seconds along ONE route. The front-end
+   uses this to keep markers moving between server updates. It stops at the
+   route's last stop and never switches routes: only the server decides that. */
+function advanceWithinRoute(routeKey, stopIndex, secIntoSeg, elapsed) {
+  var loc = normalizeLocation(routeKey, stopIndex, secIntoSeg);
+  if (!loc) return null;
+  var r = ROUTES[routeKey];
+  var last = r.stops.length - 1;
+  var idx = loc.stopIndex;
+  var sec = loc.secIntoSeg + Math.max(0, Number(elapsed) || 0);
+  while (idx < last && sec >= r.segSeconds[idx]) { sec -= r.segSeconds[idx]; idx++; }
+  if (idx >= last) return { stopIndex: last, secIntoSeg: 0 };
+  return { stopIndex: idx, secIntoSeg: roundMs(sec) };
+}
+
 /* Soonest in-service jeep on a route that is still heading to a stop.
    jeeps: [{id, label, route, stopIndex, secIntoSeg, active}] */
 function bestEta(jeeps, routeKey, targetIndex) {
@@ -149,6 +164,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     STOP_INFO: STOP_INFO, ROUTES: ROUTES, ROUTE_KEYS: ROUTE_KEYS,
     normalizeLocation: normalizeLocation, locationFromElapsed: locationFromElapsed,
+    advanceWithinRoute: advanceWithinRoute,
     etaSeconds: etaSeconds, bestEta: bestEta, fmtDuration: fmtDuration
   };
 }
