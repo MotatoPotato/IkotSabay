@@ -33,7 +33,11 @@
   var msg = document.getElementById("tripMsg");
 
   startBtn.addEventListener("click", function () {
-    fetch("http://localhost:8080/api/trips/start", {
+    startBtn.disabled = true;   // stops accidental double taps while the request is running
+    msg.textContent = "Starting your trip...";
+    // Uses the same server address as script.js (CONFIG.API_BASE)
+    var apiBase = (typeof CONFIG !== "undefined" && CONFIG.API_BASE) ? CONFIG.API_BASE : "http://localhost:8080/api";
+    fetch(apiBase + "/trips/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jeepId: jeepId })
@@ -43,12 +47,13 @@
         return res.json();
       })
       .then(function () {
-        startBtn.disabled = true;
         startBtn.textContent = "Trip started";
         msg.textContent = "Trip started on server for " + jeepId + ".";
+        if (typeof fetchJeepsFromBackend === "function") fetchJeepsFromBackend();   // refresh the map right away
       })
       .catch(function (err) {
         console.warn("Failed to reach Java server:", err);
+        startBtn.disabled = false;   // let the driver try again
         msg.textContent = "Could not reach the Java server on port 8080.";
       });
   });
