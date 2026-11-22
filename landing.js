@@ -7,9 +7,9 @@
    who views the page source. For real use, send the code to the server
    (e.g. POST /api/driver/login) and let the server check it. */
 var DRIVER_CODES = {
-  "X7K2QM": { jeepId: "J1", jeepNo: 1 },
-  "R4T9BW": { jeepId: "J2", jeepNo: 2 },
-  "M8C3ZH": { jeepId: "J3", jeepNo: 3 }
+  "ILS2627J001": { jeepId: "J1", jeepNo: 1 },
+  "ILS2627J002": { jeepId: "J2", jeepNo: 2 },
+  "ILS2627J003": { jeepId: "J3", jeepNo: 3 }
 };
 
 function $(id) { return document.getElementById(id); }
