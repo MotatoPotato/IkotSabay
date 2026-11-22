@@ -28,22 +28,29 @@
   document.getElementById("driverJeep").textContent = "Jeep " + jeepNo;
   bar.hidden = false;
 
-  // "Yes" button: start the trip
+  // "Yes" button: start the trip on the Java back-end
   var startBtn = document.getElementById("startTripBtn");
   var msg = document.getElementById("tripMsg");
 
   startBtn.addEventListener("click", function () {
-    /* TODO (BACKEND): start the trip for this jeep.
-       Example:
-         fetch("http://localhost:3000/api/trips/start", {
-           method: "POST",
-           headers: { "Content-Type": "application/json" },
-           body: JSON.stringify({ jeepId: jeepId })
-         });
-       jeepId is "J1", "J2" or "J3". */
-    startBtn.disabled = true;
-    startBtn.textContent = "Trip started";
-    msg.textContent = "Demo only: the back-end isn't connected yet, so the jeep hasn't really started.";
+    fetch("http://localhost:8080/api/trips/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jeepId: jeepId })
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error("Server error " + res.status);
+        return res.json();
+      })
+      .then(function () {
+        startBtn.disabled = true;
+        startBtn.textContent = "Trip started";
+        msg.textContent = "Trip started on server for " + jeepId + ".";
+      })
+      .catch(function (err) {
+        console.warn("Failed to reach Java server:", err);
+        msg.textContent = "Could not reach the Java server on port 8080.";
+      });
   });
 
   // Log out: clear the session and go back to the role page
