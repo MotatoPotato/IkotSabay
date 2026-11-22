@@ -1,12 +1,12 @@
 /* ==========================================================
    DLSU-D Campus Jeep Tracker - FRONT-END
    Route data and ETA math live in routes.js (load it first).
-   Search for "TODO (BACKEND)" for the back-end parts.
+   Connected to Java back-end at http://localhost:8080/api
    ========================================================== */
 
 var CONFIG = {
-  USE_BACKEND: false,                       // TODO (BACKEND): set true when API is ready
-  API_BASE: "http://localhost:3000/api",    // TODO (BACKEND): your server URL
+  USE_BACKEND: true,                        // Connected to Java server
+  API_BASE: "http://localhost:8080/api",    // Java JeepRouteCalculator server URL
   REFRESH_MS: 1000,
   BACKEND_POLL_MS: 5000,
   SERVICE_START: "07:00",                   // first trip (24-hour time)
@@ -22,16 +22,10 @@ var CONFIG = {
    from landing on the same point). Diagram only, not part of the ETA. */
 var ROUTE_SPAN = 0.9;
 
-/* ---------- Simulated jeeps (used while USE_BACKEND is false) ----------
+/* ---------- Simulated jeeps (fallback if Java server is offline) ----------
    Each simulated jeep drives Route A, then Route B, then repeats.
    ASSUMPTION (simulation only): it turns around at the terminals with
-   NO waiting time, because no dwell-time data has been collected.
-   TODO (BACKEND): real jeeps come from GET /jeeps, shape:
-     [{ "id":"J1", "label":"Jeep 1", "route":"A", "stopIndex":2,
-        "secondsIntoSegment":14.5, "active":true }]
-   route = "A" or "B"; stopIndex = index of the last stop reached in that
-   route's stops list (see routes.js); secondsIntoSegment is optional
-   (0 = exactly at the stop).                                          */
+   NO waiting time, because no dwell-time data has been collected. */
 var JEEP_COUNT = 3;
 var JEEP_SPACING_SEC = 120;   // each jeep runs 2 minutes behind the previous one
 var CYCLE_SEC = ROUTES.A.total + ROUTES.B.total;
@@ -66,7 +60,7 @@ function toMinutes(hhmm) {
   return Number(p[0]) * 60 + Number(p[1]);
 }
 /* Is the jeep service running right now?
-   reason: "demo" | "open" | "before" | "break" | "after"            */
+   reason: "demo" | "open" | "before" | "break" | "after" */
 function serviceStatus() {
   if ($("demoToggle").checked) return { open: true, reason: "demo" };
   var now = secondsNow() / 60;
@@ -107,7 +101,7 @@ function stopShort(id) { return STOP_INFO[id] ? STOP_INFO[id].short : id; }
 
 /* ---------- Jeep state ----------
    Every jeep becomes: { id, label, route, stopIndex, secIntoSeg, active }
-   stopIndex is null when the location is missing or invalid.          */
+   stopIndex is null when the location is missing or invalid. */
 function simulateJeep(j) {
   var p = (secondsNow() + j.offsetSec) % CYCLE_SEC;
   var key = "A";
@@ -135,7 +129,7 @@ function getJeepStates() {
   return JEEPS_SIM.map(simulateJeep);
 }
 
-/* TODO (BACKEND): fetch from your server */
+/* Fetch live jeep data from Java server */
 function fetchJeepsFromBackend() {
   fetch(CONFIG.API_BASE + "/jeeps")
     .then(function (res) {
@@ -408,7 +402,7 @@ function init() {
   render();
   setInterval(render, CONFIG.REFRESH_MS);
 
-  // TODO (BACKEND): poll the server for real jeep data
+  // Poll the Java server for real jeep data
   if (CONFIG.USE_BACKEND) {
     fetchJeepsFromBackend();
     setInterval(fetchJeepsFromBackend, CONFIG.BACKEND_POLL_MS);
