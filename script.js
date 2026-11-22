@@ -22,7 +22,7 @@ var CONFIG = {
    from landing on the same point). Diagram only, not part of the ETA. */
 var ROUTE_SPAN = 0.9;
 
-/* ---------- Simulated jeeps (fallback if Java server is offline) ----------
+/* ---------- Simulated jeeps (demo only: used when USE_BACKEND is false) ----------
    Each simulated jeep drives Route A, then Route B, then repeats.
    ASSUMPTION (simulation only): it turns around at the terminals with
    NO waiting time, because no dwell-time data has been collected. */
@@ -42,6 +42,8 @@ var SVG_NS = "http://www.w3.org/2000/svg";
 var selectedRouteKey = "A";
 var selectedStopId = ROUTES.A.stops[0];
 var backendJeeps = null;
+var backendFetchedAt = 0;          // when the last server answer arrived (ms)
+var backendState = "connecting";   // "connecting" | "ok" | "down"
 
 function $(id) { return document.getElementById(id); }
 function esc(s) {
@@ -115,7 +117,12 @@ function simulateJeep(j) {
 }
 
 function fromBackend(raw) {
-  var loc = normalizeLocation(raw.route, raw.stopIndex, raw.secondsIntoSegment);
+  // Keep the marker moving between server updates (the server answers every few seconds).
+  // Falls back to the plain server position if routes.js is an older version.
+  var elapsed = (Date.now() - backendFetchedAt) / 1000;
+  var loc = (typeof advanceWithinRoute === "function")
+    ? advanceWithinRoute(raw.route, raw.stopIndex, raw.secondsIntoSegment, elapsed)
+    : normalizeLocation(raw.route, raw.stopIndex, raw.secondsIntoSegment);
   return {
     id: String(raw.id), label: String(raw.label || raw.id), route: raw.route,
     stopIndex: loc ? loc.stopIndex : null,
@@ -125,22 +132,41 @@ function fromBackend(raw) {
 }
 
 function getJeepStates() {
-  if (CONFIG.USE_BACKEND && backendJeeps) return backendJeeps.map(fromBackend);
+  if (CONFIG.USE_BACKEND) {
+    // Real data only. When the server is down we show NO jeeps (never fake ones).
+    if (backendState === "ok" && backendJeeps) return backendJeeps.map(fromBackend);
+    return [];
+  }
   return JEEPS_SIM.map(simulateJeep);
+}
+
+/* Message to show instead of jeeps while the server is not answering ("" = fine) */
+function backendNotice() {
+  if (!CONFIG.USE_BACKEND) return "";
+  if (backendState === "connecting") return "Connecting to the server...";
+  if (backendState === "down") return "Live data unavailable. The server isn't responding, so no jeep positions can be shown.";
+  return "";
 }
 
 /* Fetch live jeep data from Java server */
 function fetchJeepsFromBackend() {
-  fetch(CONFIG.API_BASE + "/jeeps")
+  return fetch(CONFIG.API_BASE + "/jeeps")
     .then(function (res) {
       if (!res.ok) throw new Error("Server error " + res.status);
       return res.json();
     })
-    .then(function (data) { backendJeeps = Array.isArray(data) ? data : null; })
+    .then(function (data) {
+      if (!Array.isArray(data)) throw new Error("Unexpected server answer");
+      backendJeeps = data;
+      backendFetchedAt = Date.now();
+      backendState = "ok";
+    })
     .catch(function (err) {
-      console.warn("Backend unavailable, using simulation:", err);
+      console.warn("Server unavailable:", err);
       backendJeeps = null;
-    });
+      backendState = "down";
+    })
+    .then(function () { render(); });
 }
 
 /* ---------- Map ---------- */
@@ -274,6 +300,11 @@ function renderFinder(jeeps) {
   var idx = r.stops.indexOf(selectedStopId);
   var el = $("finderResult");
 
+  var notice = backendNotice();
+  if (notice) {
+    el.innerHTML = '<span class="muted">' + esc(notice) + '</span>';
+    return;
+  }
   var onRoute = jeeps.filter(function (j) { return j.active && j.route === selectedRouteKey; });
   if (!jeeps.some(function (j) { return j.active; })) {
     var st = serviceStatus();
@@ -300,6 +331,11 @@ function renderFinder(jeeps) {
 
 function renderJeepCards(jeeps) {
   var st = serviceStatus();
+  if (jeeps.length === 0) {
+    $("jeepCards").innerHTML = '<p class="muted">' +
+      esc(backendNotice() || "No jeeps are on the road yet.") + '</p>';
+    return;
+  }
   $("jeepCards").innerHTML = jeeps.map(function (j) {
     var r = ROUTES[j.route];
     var body;
