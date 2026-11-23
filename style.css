@@ -397,3 +397,18 @@ td.eta { font-weight: 700; color: var(--green); font-variant-numeric: tabular-nu
   .role-grid { grid-template-columns: 1fr; }
   .landing-box h1 { font-size: 1.5rem; }
 }
+
+/* ---------- Stop / Resume (Tsuper banner) ---------- */
+.driver-actions { flex-wrap: wrap; }
+.driver-actions [hidden] { display: none !important; }
+.stop-reason {
+  padding: 10px 12px; border-radius: 8px; border: 1px solid #ccc;
+  font: inherit; background: #fff; color: #222;
+}
+.btn-stop {
+  background: var(--danger, #c0392b); color: #fff; border: 0; border-radius: 8px;
+  padding: 10px 18px; font: inherit; font-weight: 700; cursor: pointer;
+}
+.btn-stop:disabled { opacity: .6; cursor: default; }
+.badge.stopped { background: #fde4e1; color: var(--danger, #c0392b); }
+.jeep-card .stopped-note { color: var(--danger, #c0392b); font-weight: 600; }
