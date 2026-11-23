@@ -25,13 +25,15 @@ import java.util.*;
  *             POST /api/trips/start         {"jeepId":"J1","route":"A"}    route is optional (default "A")
  *             POST /api/trips/end           {"jeepId":"J1"}
  *             POST /api/trips/checkin       {"jeepId":"J1","stopIndex":3}  driver reached that stop of the jeep's current route
+ *             POST /api/trips/stop          {"jeepId":"J1","reason":"Breakdown"}  jeep stopped on the road (stays on the map, not counted in ETAs)
+ *             POST /api/trips/resume        {"jeepId":"J1"}                       jeep is moving again from the same spot
  *
  * Every start / end / check-in is appended to events.csv (the real data you can use to check accuracy later).
  */
 public class JeepRouteCalculator {
 
     // ---------- Settings ----------
-    static final ZoneId ZONE = ZoneId.of("Asia/Manila");        // schedule uses Philippine time ofc, whatever the server's clock says 
+    static final ZoneId ZONE = ZoneId.of("Asia/Manila");        // schedule uses Philippine time, whatever the server's clock says
     static final LocalTime SERVICE_START = LocalTime.of(7, 0);
     static final LocalTime SERVICE_END = LocalTime.of(16, 0);
     static final LocalTime[][] BREAKS = { { LocalTime.of(11, 30), LocalTime.of(13, 30) } };   // lunch break
@@ -142,6 +144,8 @@ public class JeepRouteCalculator {
         public int stopIndex = 0;
         public double secondsIntoSegment = 0.0;
         public boolean active = false;          // a jeep is NOT on the road until its driver starts a trip
+        public boolean stopped = false;         // on a trip but not moving (breakdown, flat tire, ...)
+        public String stopReason = "";
 
         public JeepUnit(String id, String label) {
             this.id = id;
@@ -153,17 +157,21 @@ public class JeepRouteCalculator {
             stopIndex = 0;
             secondsIntoSegment = 0.0;
             active = true;
+            stopped = false;
+            stopReason = "";
         }
 
         void stop() {
             active = false;
+            stopped = false;
+            stopReason = "";
             route = "A";
             stopIndex = 0;
             secondsIntoSegment = 0.0;
         }
 
         public void advance(double elapsedSeconds) {
-            if (!active || elapsedSeconds <= 0) return;
+            if (!active || stopped || elapsedSeconds <= 0) return;   // a stopped jeep stays exactly where it is
 
             double remainingDelta = elapsedSeconds;
             while (remainingDelta > 0) {
@@ -195,8 +203,9 @@ public class JeepRouteCalculator {
 
         public String toJson() {
             return String.format(Locale.US,
-                "{\"id\":\"%s\",\"label\":\"%s\",\"route\":\"%s\",\"stopIndex\":%d,\"secondsIntoSegment\":%.3f,\"active\":%s}",
-                escapeJson(id), escapeJson(label), escapeJson(route), stopIndex, secondsIntoSegment, active
+                "{\"id\":\"%s\",\"label\":\"%s\",\"route\":\"%s\",\"stopIndex\":%d,\"secondsIntoSegment\":%.3f,\"active\":%s,\"stopped\":%s,\"stopReason\":\"%s\"}",
+                escapeJson(id), escapeJson(label), escapeJson(route), stopIndex, secondsIntoSegment, active,
+                stopped, escapeJson(stopReason)
             );
         }
     }
@@ -252,13 +261,19 @@ public class JeepRouteCalculator {
 
     // ---------- Event log (events.csv) ----------
     private static void logEvent(String event, JeepUnit j) {
+        logEvent(event, j, "");
+    }
+
+    /** note = free text such as the reason for a stop. STOPPED..RESUMED periods must be left out when you compute travel-time averages. */
+    private static void logEvent(String event, JeepUnit j, String note) {
         String line = String.join(",",
             OffsetDateTime.now(ZONE).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
             event, j.id, j.route, String.valueOf(j.stopIndex),
-            String.format(Locale.US, "%.3f", j.secondsIntoSegment)) + "\n";
+            String.format(Locale.US, "%.3f", j.secondsIntoSegment),
+            "\"" + note.replace("\"", "\"\"") + "\"") + "\n";
         try {
             if (!Files.exists(EVENT_LOG)) {
-                Files.writeString(EVENT_LOG, "timestamp,event,jeepId,route,stopIndex,secondsIntoSegment\n");
+                Files.writeString(EVENT_LOG, "timestamp,event,jeepId,route,stopIndex,secondsIntoSegment,note\n");
             }
             Files.writeString(EVENT_LOG, line, StandardOpenOption.APPEND);
         } catch (IOException e) {
@@ -310,6 +325,7 @@ public class JeepRouteCalculator {
             JeepUnit j = findJeep(jeepId);
             if (j == null) return error(404, "Unknown jeep: " + jeepId);
             if (!j.active) return error(409, "This jeep has not started a trip");
+            if (j.stopped) return error(409, "This jeep is stopped. Resume the trip first.");
             RouteInfo r = ROUTES.get(j.route);
             if (stopIndex < 0 || stopIndex >= r.stops.size()) {
                 return error(400, "stopIndex must be between 0 and " + (r.stops.size() - 1) + " for route " + j.route);
@@ -320,6 +336,45 @@ public class JeepRouteCalculator {
             logEvent("CHECKIN", j);
             return new Response(200, "{\"ok\":true,\"jeepId\":\"" + escapeJson(j.id) + "\",\"route\":\"" + j.route
                 + "\",\"stopIndex\":" + stopIndex + "}");
+        }
+    }
+
+    /** The jeep stopped on the road (breakdown, flat tire, ...). It stays on the map where it stopped and is not counted in ETAs. */
+    private static Response stopTrip(String jeepId, String reason) {
+        if (jeepId.isEmpty()) return error(400, "jeepId is required");
+        reason = reason.trim();
+        if (reason.isEmpty()) reason = "Problem on the road";
+        if (reason.length() > 40) reason = reason.substring(0, 40);
+        synchronized (LOCK) {
+            tickFleet();   // bring the position up to date BEFORE freezing it
+            JeepUnit j = findJeep(jeepId);
+            if (j == null) return error(404, "Unknown jeep: " + jeepId);
+            if (!j.active) return error(409, "This jeep is not on a trip");
+            if (j.stopped) {
+                return new Response(200, "{\"ok\":true,\"alreadyStopped\":true,\"jeepId\":\"" + escapeJson(j.id) + "\"}");
+            }
+            j.stopped = true;
+            j.stopReason = reason;
+            logEvent("STOPPED", j, reason);
+            return new Response(200, "{\"ok\":true,\"jeepId\":\"" + escapeJson(j.id) + "\"}");
+        }
+    }
+
+    /** The jeep is moving again. It continues from the exact spot where it stopped. */
+    private static Response resumeTrip(String jeepId) {
+        if (jeepId.isEmpty()) return error(400, "jeepId is required");
+        synchronized (LOCK) {
+            tickFleet();
+            JeepUnit j = findJeep(jeepId);
+            if (j == null) return error(404, "Unknown jeep: " + jeepId);
+            if (!j.active) return error(409, "This jeep is not on a trip");
+            if (!j.stopped) {
+                return new Response(200, "{\"ok\":true,\"alreadyRunning\":true,\"jeepId\":\"" + escapeJson(j.id) + "\"}");
+            }
+            j.stopped = false;
+            j.stopReason = "";
+            logEvent("RESUMED", j);
+            return new Response(200, "{\"ok\":true,\"jeepId\":\"" + escapeJson(j.id) + "\"}");
         }
     }
 
@@ -379,6 +434,12 @@ public class JeepRouteCalculator {
 
         api(server, "/api/trips/checkin", "POST", (ex, body) ->
             checkIn(extractJsonString(body, "jeepId"), extractJsonInt(body, "stopIndex")));
+
+        api(server, "/api/trips/stop", "POST", (ex, body) ->
+            stopTrip(extractJsonString(body, "jeepId"), extractJsonString(body, "reason")));
+
+        api(server, "/api/trips/resume", "POST", (ex, body) ->
+            resumeTrip(extractJsonString(body, "jeepId")));
 
         server.setExecutor(null);
         server.start();
