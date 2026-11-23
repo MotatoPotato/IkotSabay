@@ -43,18 +43,27 @@
       body: JSON.stringify({ jeepId: jeepId })
     })
       .then(function (res) {
-        if (!res.ok) throw new Error("Server error " + res.status);
+        if (!res.ok) {
+          // The server explains why it refused (e.g. "Service is closed right now...")
+          return res.json().catch(function () { return {}; }).then(function (b) {
+            var e = new Error("Server error " + res.status);
+            e.serverMessage = b.error || "";
+            throw e;
+          });
+        }
         return res.json();
       })
-      .then(function () {
+      .then(function (data) {
         startBtn.textContent = "Trip started";
-        msg.textContent = "Trip started on server for " + jeepId + ".";
+        msg.textContent = (data && data.alreadyRunning)
+          ? "Your trip is already running."
+          : "Trip started on server for " + jeepId + ".";
         if (typeof fetchJeepsFromBackend === "function") fetchJeepsFromBackend();   // refresh the map right away
       })
       .catch(function (err) {
         console.warn("Failed to reach Java server:", err);
         startBtn.disabled = false;   // let the driver try again
-        msg.textContent = "Could not reach the Java server on port 8080.";
+        msg.textContent = err.serverMessage || "Could not reach the Java server on port 8080.";
       });
   });
 
