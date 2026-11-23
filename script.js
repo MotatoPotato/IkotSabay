@@ -119,7 +119,9 @@ function simulateJeep(j) {
 function fromBackend(raw) {
   // Keep the marker moving between server updates (the server answers every few seconds).
   // Falls back to the plain server position if routes.js is an older version.
-  var elapsed = (Date.now() - backendFetchedAt) / 1000;
+  var stopped = !!raw.stopped;
+  // A stopped jeep does not move: do not interpolate its position.
+  var elapsed = stopped ? 0 : (Date.now() - backendFetchedAt) / 1000;
   var loc = (typeof advanceWithinRoute === "function")
     ? advanceWithinRoute(raw.route, raw.stopIndex, raw.secondsIntoSegment, elapsed)
     : normalizeLocation(raw.route, raw.stopIndex, raw.secondsIntoSegment);
@@ -127,7 +129,9 @@ function fromBackend(raw) {
     id: String(raw.id), label: String(raw.label || raw.id), route: raw.route,
     stopIndex: loc ? loc.stopIndex : null,
     secIntoSeg: loc ? loc.secIntoSeg : 0,
-    active: !!raw.active && isActive()   // also respect the service schedule
+    active: !!raw.active && isActive(),   // also respect the service schedule
+    stopped: stopped,
+    stopReason: String(raw.stopReason || "")
   };
 }
 
@@ -252,6 +256,7 @@ function updateMap(jeeps) {
     var pt = pathPoint((travelled / r.total) * ROUTE_SPAN);
     m.setAttribute("transform", "translate(" + pt.x + ", " + pt.y + ")");
     m.style.display = "";
+    m.classList.toggle("offline", !!j.stopped);   // greyed out while stopped
   });
 }
 
@@ -317,6 +322,13 @@ function renderFinder(jeeps) {
     return;
   }
   var best = bestEta(jeeps, selectedRouteKey, idx);
+  var stoppedOnRoute = onRoute.filter(function (j) { return j.stopped; });
+  if (!best && stoppedOnRoute.length > 0 && stoppedOnRoute.length === onRoute.length) {
+    el.innerHTML = '<span class="muted">' + esc(stoppedOnRoute[0].label) + ' is stopped (' +
+      esc(stoppedOnRoute[0].stopReason || "problem on the road") +
+      '). No jeep is moving on this route right now.</span>';
+    return;
+  }
   if (!best) {
     var why = idx === 0
       ? 'This is the <b>first stop</b> of Route ' + r.key + ' (' + esc(r.label) + '). A jeep only counts here once it has started this route. Try another stop or the other direction.'
@@ -348,7 +360,12 @@ function renderJeepCards(jeeps) {
       var atStop = j.secIntoSeg === 0;
       var pct = ((r.cum[j.stopIndex] + j.secIntoSeg) / r.total) * 100;
       body = '<p>Route ' + r.key + ': <b>' + esc(r.label) + '</b></p>';
-      if (last) {
+      if (j.stopped) {
+        body += '<p class="stopped-note">Stopped: ' + esc(j.stopReason || "problem on the road") + '</p>' +
+                '<p>Near <b>' + esc(stopName(r.stops[j.stopIndex])) + '</b>' +
+                (last ? '' : ' (heading to ' + esc(stopName(r.stops[j.stopIndex + 1])) + ')') + '</p>' +
+                '<p class="muted">Not counted in arrival estimates.</p>';
+      } else if (last) {
         body += '<p>Reached <b>' + esc(stopName(r.stops[j.stopIndex])) + '</b> (end of route)</p>';
       } else {
         var next = r.stops[j.stopIndex + 1];
@@ -360,8 +377,8 @@ function renderJeepCards(jeeps) {
       body += '<div class="progress"><div style="width:' + pct.toFixed(1) + '%"></div></div>';
     }
     return '<div class="jeep-card">' +
-      '<h4>' + esc(j.label) + ' <span class="badge ' + (j.active ? "" : "off") + '">' +
-      (j.active ? "In service" : (st.reason === "break" ? esc(st.label) : "Off duty")) +
+      '<h4>' + esc(j.label) + ' <span class="badge ' + (j.stopped ? "stopped" : (j.active ? "" : "off")) + '">' +
+      (j.stopped ? "Stopped" : (j.active ? "In service" : (st.reason === "break" ? esc(st.label) : "Off duty"))) +
       '</span></h4>' + body + '</div>';
   }).join("");
 }
