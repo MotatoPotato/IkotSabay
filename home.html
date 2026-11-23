@@ -14,6 +14,7 @@
 <header class="site-header">
   <div class="container header-inner">
     <div class="brand">
+      <span class="brand-mark">🚌</span>
       <div>
         <h1>DLSU-D Campus Jeep Tracker</h1>
         <p>De La Salle University – Dasmariñas</p>
@@ -40,6 +41,15 @@
     </div>
     <div class="driver-actions">
       <button id="startTripBtn" class="btn-yes" type="button">Yes</button>
+      <select id="stopReason" class="stop-reason" aria-label="Reason for stopping" hidden>
+        <option>Breakdown</option>
+        <option>Flat tire</option>
+        <option>Out of fuel</option>
+        <option>Accident / road blocked</option>
+        <option>Other problem</option>
+      </select>
+      <button id="stopTripBtn" class="btn-stop" type="button" hidden>Stop</button>
+      <button id="resumeTripBtn" class="btn-yes" type="button" hidden>Resume trip</button>
       <button id="logoutBtn" class="btn-ghost" type="button">Log out</button>
     </div>
   </div>
