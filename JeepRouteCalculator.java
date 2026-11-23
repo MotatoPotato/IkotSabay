@@ -36,13 +36,13 @@ public class JeepRouteCalculator {
     static final ZoneId ZONE = ZoneId.of("Asia/Manila");        // schedule uses Philippine time, whatever the server's clock says
     static final LocalTime SERVICE_START = LocalTime.of(7, 0);
     static final LocalTime SERVICE_END = LocalTime.of(16, 0);
-    static final LocalTime[][] BREAKS = { { LocalTime.of(11, 30), LocalTime.of(13, 30) } };   // lunch break
+    static final LocalTime[][] BREAKS = { { LocalTime.of(11, 30), LocalTime.of(13, 30) } };   // lunch break yay
     static boolean enforceSchedule = true;                       // --demo turns this off
     static final Path EVENT_LOG = Paths.get("events.csv");
     static final String CLOSED_MSG =
         "Service is closed right now. Jeeps run 7:00 AM to 4:00 PM, with no jeeps from 11:30 AM to 1:30 PM.";
 
-    /** Is the jeep service running at this time of day? (propositional logic: p AND q AND NOT r) */
+    /** Is the jeep service running at this time of day??? (propositional logic: p AND q AND NOT r) */
     public static boolean serviceOpen(LocalTime t) {
         if (t.isBefore(SERVICE_START) || !t.isBefore(SERVICE_END)) return false;
         for (LocalTime[] b : BREAKS) {
