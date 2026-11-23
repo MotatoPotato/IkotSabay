@@ -31,7 +31,7 @@ import java.util.*;
 public class JeepRouteCalculator {
 
     // ---------- Settings ----------
-    static final ZoneId ZONE = ZoneId.of("Asia/Manila");        // schedule uses Philippine time, whatever the server's clock says
+    static final ZoneId ZONE = ZoneId.of("Asia/Manila");        // schedule uses Philippine time ofc, whatever the server's clock says 
     static final LocalTime SERVICE_START = LocalTime.of(7, 0);
     static final LocalTime SERVICE_END = LocalTime.of(16, 0);
     static final LocalTime[][] BREAKS = { { LocalTime.of(11, 30), LocalTime.of(13, 30) } };   // lunch break
