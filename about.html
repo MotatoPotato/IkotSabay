@@ -44,6 +44,11 @@
 
   <section id="methodology" class="card about-card">
     <div class="card-head"><h3>Methodology</h3></div>
+    <p><b>Arrays</b> The average travel times between stops are stored in arrays, which the ETA adds up for the remaining segments. </p>
+    <p><b>Ordered Lists</b> Each route's stops are kept in order, so the system knows which stops are ahead of the jeepney and which it has passed.</p>
+    <p><b>Graph Modeling</b> The route is modeled as a weighted directed graph, with stops as vertices and the average travel time between stops as the edge weights.</p>
+    <p><b>Hash Maps</b> Key-value maps look up a route or stop name directly from a key such as "A" or "ULS", without searching a list. </p>
+    <p><b>Structured Objects</b> Each jeepney is stored as an object that groups its id, route, current stop, position and status. </p>
     <p><b>Graph Theory</b> is used in mapping the campus. To create a physical layout of the campus and jeep’s routes inside.</p>
     <p><b>Algorithms</b> is used in calculating the arrival time. Will be running in the background to convert live location updates into estimated arrival times (ETAs).</p>
     <p><b>Propositional Logic & Equivalence</b> determine jeepney availability. The service is open only between 7:00 AM and 4:00 PM, excluding lunch break. Based on the current time, the system displays whether the service is open or closed.</p>
@@ -51,7 +56,7 @@
 
   <section id="methodology" class="card about-card">
     <div class="card-head"><h3>Estimation of Travel Time</h3></div>
-    <p>Time between stops was computed from timed trips of the university jeepney along its two official routes: Route A (Gate 3 to Gate 1) and Route B (Gate 1 to Gate 3). For each pair of consecutive stops, the travel time was recorded over several observations, and the arithmetic mean of those observations was used as the average travel time for that segment. The two directions were measured separately because their stop sequences differ. The estimated time of arrival (ETA) at a stop is then the sum of the average travel times of all remaining segments between the jeepney’s current position and that stop. If the jeepney is between two stops, the remaining time of the current segment is added to the averages of the segments that follow. The data is preliminary, since each segment has relatively few observations, and the estimates do not account for live traffic.</p>
+    <p>The estimated time between stops was computed from timed trips of the university jeepney along its two official routes: Route A (Gate 3 to Gate 1) and Route B (Gate 1 to Gate 3). For each pair of consecutive stops, the travel time was recorded over several observations, and the arithmetic mean of those observations was used as the average travel time for that segment. The two directions were measured separately because their stop sequences differ. These averages are stored in the system for each route. When a driver starts a trip, the server records which jeepney started and on which route, then tracks its position by adding up the elapsed time against the stored averages, moving the jeepney along its stops. The website asks the server for the jeepneys' positions every few seconds. The estimated time of arrival (ETA) at a stop is then the sum of the average travel times of all remaining segments between the jeepney's current position and that stop. If the jeepney is between two stops, the remaining time of the current segment is added to the averages of the segments that follow. Only jeepneys that have started a trip are shown, and the system only runs during the service hours, excluding the lunch break. The data is preliminary, since each segment has relatively few observations, and the estimates do not use GPS or account for live traffic, so a jeepney that runs faster or slower than the averages will differ from its estimated position.</p>
   </section>
 
   <div class="back-wrap">
