@@ -132,11 +132,12 @@ function advanceWithinRoute(routeKey, stopIndex, secIntoSeg, elapsed) {
 }
 
 /* Soonest in-service jeep on a route that is still heading to a stop.
-   jeeps: [{id, label, route, stopIndex, secIntoSeg, active}] */
+   Stopped jeeps (breakdown etc.) are skipped.
+   jeeps: [{id, label, route, stopIndex, secIntoSeg, active, stopped}] */
 function bestEta(jeeps, routeKey, targetIndex) {
   var best = null;
   jeeps.forEach(function (j) {
-    if (!j.active || j.route !== routeKey) return;
+    if (!j.active || j.stopped || j.route !== routeKey) return;   // a stopped jeep is not approaching anything
     var res = etaSeconds(j.route, j.stopIndex, j.secIntoSeg, targetIndex);
     if (res.status === "ok" && (!best || res.seconds < best.seconds)) {
       best = { jeep: j, seconds: res.seconds };
