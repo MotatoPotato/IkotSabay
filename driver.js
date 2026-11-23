@@ -67,14 +67,14 @@
   }
 
   /* mode: "idle" (no trip) | "running" | "stopped" */
+  function setEl(el, hidden) { if (el) { el.hidden = hidden; el.disabled = false; } }
+
   function showMode(mode, reason) {
-    startBtn.hidden = mode !== "idle";
-    stopBtn.hidden = mode !== "running";
-    reasonSel.hidden = mode !== "running";
-    resumeBtn.hidden = mode !== "stopped";
-    startBtn.disabled = false;
-    stopBtn.disabled = false;
-    resumeBtn.disabled = false;
+    // setEl skips missing elements, so an old home.html can't break the Yes button
+    setEl(startBtn, mode !== "idle");
+    setEl(stopBtn, mode !== "running");
+    setEl(reasonSel, mode !== "running");
+    setEl(resumeBtn, mode !== "stopped");
     if (mode === "idle") {
       askEl.textContent = "Ready to start your trip with Lasallian?";
       startBtn.textContent = "Yes";
@@ -120,8 +120,9 @@
       .catch(function (err) { fail(startBtn, err); });
   });
 
-  stopBtn.addEventListener("click", function () {
+  if (stopBtn) stopBtn.addEventListener("click", function () {
     // Confirm first so nobody stops the jeep by an accidental tap
+    if (!reasonSel) return;
     if (!window.confirm("Stop your trip? Students will see that " + (jeepNo ? "Jeep " + jeepNo : "your jeep") +
       " is stopped (" + reasonSel.value + ") and it will not be counted in arrival estimates.")) return;
     stopBtn.disabled = true;
@@ -136,7 +137,7 @@
       .catch(function (err) { fail(stopBtn, err); });
   });
 
-  resumeBtn.addEventListener("click", function () {
+  if (resumeBtn) resumeBtn.addEventListener("click", function () {
     resumeBtn.disabled = true;
     msg.textContent = "Resuming your trip...";
     post("/trips/resume")
